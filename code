@@ -1,1 +1,68 @@
 
+
+#include <SPI.h>
+#include <MFRC522.h>
+
+#define SS_PIN 10
+#define RST_PIN 9
+#define BUZZER 7
+
+MFRC522 mfrc522(SS_PIN, RST_PIN);
+
+// Replace these with your card UIDs
+byte card1[] = {0xDE, 0xAD, 0xBE, 0xEF};
+byte card2[] = {0x12, 0x34, 0x56, 0x78};
+
+void setup() {
+  Serial.begin(9600);
+  SPI.begin();
+  mfrc522.PCD_Init();
+  pinMode(BUZZER, OUTPUT);
+
+  Serial.println("RFID Attendance System Ready");
+}
+
+bool matchUID(byte *readUID, byte *knownUID, byte len) {
+  for (byte i = 0; i < len; i++) {
+    if (readUID[i] != knownUID[i]) return false;
+  }
+  return true;
+}
+
+void beep(int t) {
+  digitalWrite(BUZZER, HIGH);
+  delay(t);
+  digitalWrite(BUZZER, LOW);
+}
+
+void loop() {
+  if (!mfrc522.PICC_IsNewCardPresent()) return;
+  if (!mfrc522.PICC_ReadCardSerial()) return;
+
+  Serial.print("Card UID: ");
+  for (byte i = 0; i < mfrc522.uid.size; i++) {
+    Serial.print(mfrc522.uid.uidByte[i] < 0x10 ? "0" : "");
+    Serial.print(mfrc522.uid.uidByte[i], HEX);
+    Serial.print(" ");
+  }
+  Serial.println();
+
+  bool allowed = false;
+
+  if (mfrc522.uid.size == 4) {
+    if (matchUID(mfrc522.uid.uidByte, card1, 4)) allowed = true;
+    if (matchUID(mfrc522.uid.uidByte, card2, 4)) allowed = true;
+  }
+
+  if (allowed) {
+    Serial.println("Attendance Marked");
+    beep(200);
+  } else {
+    Serial.println("Unknown Card");
+    beep(800);
+  }
+
+  mfrc522.PICC_HaltA();
+  mfrc522.PCD_StopCrypto1();
+  delay(1000);
+}
